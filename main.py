@@ -1,15 +1,8 @@
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from tkinter import ttk
-
-import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox
-from tkinter import ttk
-from pygments import lex, highlight
-from pygments.lexers import PythonLexer
-from pygments.styles import get_all_styles
+from threading import Thread
+import subprocess
 
 class CodeEditor:
     def __init__(self, root):
@@ -27,7 +20,7 @@ class CodeEditor:
         self.file_menu.add_command(label="Save As", command=self.save_as_file)
         self.file_menu.add_command(label="Exit", command=self.exit)
         self.menubar.add_cascade(label="File", menu=self.file_menu)
-        self.style_names = get_all_styles()
+
         self.run_button = tk.Button(self.root, text="Run", command=self.run_code, bg="#4c5154", fg="white")
         self.run_button.pack(side=tk.LEFT)
 
@@ -49,7 +42,6 @@ class CodeEditor:
                 content = file.read()
                 self.text_area.delete(1.0, tk.END)
                 self.text_area.insert(1.0, content)
-                self.syntax_highlight()
 
     def save_file(self):
         if self.file_name:
@@ -70,7 +62,13 @@ class CodeEditor:
     def run_code(self):
         code = self.text_area.get(1.0, tk.END)
         try:
-            exec(code)
+            process = subprocess.Popen(code, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = process.stdout.read().decode()
+            error = process.stderr.read().decode()
+            if output:
+                self.text_area.insert(tk.END, output + '\n')
+            if error:
+                messagebox.showerror("Error", error)
             messagebox.showinfo("Success", "Code executed successfully!")
         except Exception as e:
             messagebox.showerror("Error", str(e))
@@ -85,52 +83,41 @@ class CodeEditor:
         pass
 
     def syntax_highlight(self):
-        code = self.text_area.get(1.0, tk.END)
-        lexer = PythonLexer()
-        formatter = HtmlFormatter()
-        highlighted_code = highlight(code, lexer, formatter)
-        style_names = find_style_names()
-        highlighted_code.splitlines()
-        for i in range(len(highlighted_code)):
-            line_number = i + 1
-            line_contents = highlighted_code.splitlines()[i]
-            if line_contents.startswith('def '):
-                line_contents = '<span style="color:blue;">' + line_contents + '</span>'
-            elif line_contents.startswith('class '):
-                line_contents = '<span style="color:purple;">' + line_contents + '</span>'
-            elif line_contents.startswith('print'):
-                line_contents = '<span style="color:orange;">' + line_contents + '</span>'
-            elif line_contents.startswith('if ') or line_contents.startswith('for ') or line_contents.startswith('while '):
-                line_contents = '<span style="color:green;">' + line_contents + '</span>'
-            else:
-                line_contents = '<span style="color:black;">' + line_contents + '</span>'
-            self.text_area.insert(tk.END, str(line_number) + ' ' + line_contents + '\n')
-            if i < len(highlighted_code) - 1:
-                self.text_area.insert(tk.END, '\n')
-                
-                
+        # Implement syntax highlighting functionality here
+        pass
+
 class ExecutionPanel:
     def __init__(self, root, code_editor):
         self.root = root
         self.code_editor = code_editor
-        self.terminal = tk.Text(self.root)
+        self.terminal = tk.Text(self.root, bg="#1a1d23", fg="white", font=("Arial", 12))
         self.terminal.pack(fill=tk.BOTH, expand=1)
 
     def run_code(self):
         code = self.code_editor.text_area.get(1.0, tk.END)
         try:
-            output = eval(code)
-            if isinstance(output, str):
-                output = output + '\n'
-            else:
-                output = str(output) + '\n'
-            self.terminal.insert(tk.END, output)
+            process = subprocess.Popen(code, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            output = process.stdout.read().decode()
+            error = process.stderr.read().decode()
+            if output:
+                output_thread = Thread(target=self.insert_output_to_terminal, args=(output,))
+                output_thread.start()
+            if error:
+                messagebox.showerror("Error", error)
             messagebox.showinfo("Success", "Code executed successfully!")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    def insert_output_to_terminal(self, output):
+        for line in output.splitlines():
+            line += '\n'
+            if line != '\n':
+                self.code_editor.terminal.insert(tk.END, line)
+
 if __name__ == "__main__":
     root = tk.Tk()
+    root.configure(bg="#1a1d23")
+    root.title("Python IDE")
     code_editor = CodeEditor(root)
     execution_panel = ExecutionPanel(root, code_editor)
     root.mainloop()
